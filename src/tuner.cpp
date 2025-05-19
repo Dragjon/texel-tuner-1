@@ -900,6 +900,7 @@ void Tuner::run(const std::vector<DataSource>& sources)
 
         constexpr tune_t beta1 = 0.9;
         constexpr tune_t beta2 = 0.999;
+        constexpr tune_t epsilon = 1e-8;
 
         for (int parameter_index = 0; parameter_index < parameters.size(); parameter_index++) {
 #if TAPERED
@@ -914,7 +915,11 @@ void Tuner::run(const std::vector<DataSource>& sources)
             const tune_t grad = -K / 400.0 * gradient[parameter_index] / static_cast<tune_t>(entries.size());
             momentum[parameter_index] = beta1 * momentum[parameter_index] + (1 - beta1) * grad;
             velocity[parameter_index] = beta2 * velocity[parameter_index] + (1 - beta2) * pow(grad, 2);
-            parameters[parameter_index] -= learning_rate * momentum[parameter_index] / (1e-8 + sqrt(velocity[parameter_index]));
+
+            tune_t m_hat = momentum[parameter_index] / (1 - std::pow(beta1, epoch));
+            tune_t v_hat = velocity[parameter_index] / (1 - std::pow(beta2, epoch));
+
+            parameters[parameter_index] -= learning_rate * m_hat / (std::sqrt(v_hat) + epsilon);
 #endif
             
         }
