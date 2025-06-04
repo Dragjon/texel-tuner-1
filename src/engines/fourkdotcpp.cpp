@@ -229,7 +229,7 @@ struct Trace
     int pst_file[48][2]{};
     int mobilities[6][2]{};
     int king_attacks[6][2]{};
-    int open_files[6][2]{};
+    int open_files[2][6][2]{};
     //int protected_pawn[2]{};
     //int passed_pawns[7][2]{};
     //int passed_pawn[2]{};
@@ -255,7 +255,7 @@ const i32 pst_file[] = {
     S(-2, -3), S(-1, -1), S(-1, 0), S(0, 1),  S(0, 2),  S(1, 2),  S(2, 0),  S(1, -1),   // Queen
     S(-2, -5), S(2, -1),  S(-1, 1), S(-4, 2), S(-4, 2), S(-2, 2), S(2, -1), S(0, -5),   // King
 };
-const i32 open_files[] = { 0,0,0,0,0,0 };
+const i32 open_files[2][6] = { 0 };
 const i32 mobilities[] = { 0,0,0,0,0,0 };
 const i32 king_attacks[] = { 0,0,0,0,0,0 };
 //const i32 protected_pawn = 0;
@@ -269,13 +269,14 @@ const i32 bishop_pair = 0;
 
 static Trace eval(Position& pos) {
     Trace trace{};
-    int score = S(16, 8);
+    int score = S(16, 16);
     int phase = 0;
 
     for (int c = 0; c < 2; ++c) {
         const int color = pos.flipped;
 
         const u64 own_pawns = pos.colour[0] & pos.pieces[Pawn];
+        const u64 opp_pawns = pos.colour[1] & pos.pieces[Pawn];
         u64 no_passers = pos.colour[1] & pos.pieces[Pawn];
         no_passers |= se(no_passers) | sw(no_passers);
         const u64 opp_king_zone = king(lsb(pos.colour[1] & pos.pieces[King]), 0);
@@ -315,8 +316,8 @@ static Trace eval(Position& pos) {
                 TraceAdd(pst_file[p * 8 + file], 1);
 
                 if ((north(0x101010101010101UL << sq) & own_pawns) == 0) {
-                    score += open_files[p];
-                    TraceIncr(open_files[p]);
+                    score += open_files[(north(0x101010101010101UL << sq) & opp_pawns) == 0][p];
+                    TraceIncr(open_files[(north(0x101010101010101UL << sq) & opp_pawns) == 0][p]);
                 }
 
                 //if (p == Pawn && !(0x101010101010101ull << sq & no_passers)) {
@@ -486,6 +487,27 @@ static void print_pst(std::stringstream& ss, const parameters_t& parameters, int
     ss << "};" << endl;
 }
 
+static void print_array_2d_tapered(std::stringstream& ss, const parameters_t& parameters, int& index, const PhaseStages phase, const std::string& name, const int count1, const int count2)
+{
+    ss << "." << name << " = {\n";
+    for (auto i = 0; i < count1; i++)
+    {
+        ss << "    {";
+        for (auto j = 0; j < count2; j++)
+        {
+            print_parameter_tapered(ss, phase, parameters[index]);
+            index++;
+
+            if (j != count2 - 1)
+            {
+                ss << ", ";
+            }
+        }
+        ss << "},\n";
+    }
+    ss << "},\n";
+}
+
 static void print_array_2d(std::stringstream& ss, const parameters_t& parameters, int& index, const std::string& name, const int count1, const int count2)
 {
     ss << "const i32 " << name << "[][" << count2 << "] = {\n";
@@ -565,7 +587,7 @@ parameters_t FourkdotcppEval::get_initial_parameters()
     get_initial_parameter_array(parameters, pst_file, 48);
     get_initial_parameter_array(parameters, mobilities, 6);
     get_initial_parameter_array(parameters, king_attacks, 6);
-    get_initial_parameter_array(parameters, open_files, 6);
+    get_initial_parameter_array_2d(parameters, open_files, 2, 6);
     get_initial_parameter_single(parameters, bishop_pair);
     return parameters;
 }
@@ -578,7 +600,7 @@ static coefficients_t get_coefficients(const Trace& trace)
     get_coefficient_array(coefficients, trace.pst_file, 48);
     get_coefficient_array(coefficients, trace.mobilities, 6);
     get_coefficient_array(coefficients, trace.king_attacks, 6);
-    get_coefficient_array(coefficients, trace.open_files, 6);
+    get_coefficient_array_2d(coefficients, trace.open_files, 2, 6);
     get_coefficient_single(coefficients, trace.bishop_pair);
     return coefficients;
 }
@@ -598,7 +620,7 @@ static void print_parameters_tapered(const parameters_t& parameters)
         print_pst_tapered(ss, parameters, index, phase, "pst_file");
         print_array_tapered(ss, parameters, index, phase, "mobilities", 6);
         print_array_tapered(ss, parameters, index, phase, "king_attacks", 6);
-        print_array_tapered(ss, parameters, index, phase, "open_files", 6);
+        print_array_2d_tapered(ss, parameters, index, phase, "open_files", 2, 6);
         print_single_tapered(ss, parameters, index, phase, "bishop_pair");
     }
 
@@ -615,16 +637,16 @@ void FourkdotcppEval::print_parameters(const parameters_t& parameters)
 
     return;
 
-    int index = 0;
-    stringstream ss;
-    print_array(ss, parameters_copy, index, "material", 6);
-    print_pst(ss, parameters_copy, index, "pst_rank");
-    print_pst(ss, parameters_copy, index, "pst_file");
-    print_array(ss, parameters_copy, index, "mobilities", 6);
-    print_array(ss, parameters_copy, index, "king_attacks", 6);
-    print_array(ss, parameters_copy, index, "open_files", 6);
-    print_single(ss, parameters_copy, index, "bishop_pair");
-    cout << ss.str() << "\n";
+    //int index = 0;
+    //stringstream ss;
+    //print_array(ss, parameters_copy, index, "material", 6);
+    //print_pst(ss, parameters_copy, index, "pst_rank");
+    //print_pst(ss, parameters_copy, index, "pst_file");
+    //print_array(ss, parameters_copy, index, "mobilities", 6);
+    //print_array(ss, parameters_copy, index, "king_attacks", 6);
+    //print_array(ss, parameters_copy, index, "open_files", 6);
+    //print_single(ss, parameters_copy, index, "bishop_pair");
+    //cout << ss.str() << "\n";
 }
 
 static Position get_position_from_external(const chess::Board& board)
