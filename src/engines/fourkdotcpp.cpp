@@ -315,7 +315,6 @@ static Trace eval(Position& pos) {
                 TraceAdd(pst_file[p * 8 + file], 1);
 
                 if ((north(0x101010101010101UL << sq) & own_pawns) == 0) {
-                //if ((0x101010101010101ULL << file & ~(1ULL << sq) & own_pawns) == 0) {
                     score += open_files[p];
                     TraceIncr(open_files[p]);
                 }
