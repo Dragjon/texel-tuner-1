@@ -269,7 +269,7 @@ const i32 bishop_pair = 0;
 
 static Trace eval(Position& pos) {
     Trace trace{};
-    int score = S(16, 16);
+    int score = S(16, 8);
     int phase = 0;
 
     for (int c = 0; c < 2; ++c) {
@@ -326,7 +326,7 @@ static Trace eval(Position& pos) {
                 //}
 
                 const u64 mobility = get_mobility(sq, p /*== King ? Queen : p*/, &pos);
-                if (p != Knight) {
+                if (p > Knight) {
                     score += mobilities[p] * count(mobility & ~pos.colour[0]);
                     TraceAdd(mobilities[p], count(mobility & ~pos.colour[0]));
 
@@ -351,7 +351,8 @@ static Trace eval(Position& pos) {
     auto stronger_colour_pawn_count = count(stronger_colour_pawns);
     auto stronger_colour_pawns_missing = 8 - stronger_colour_pawn_count;
     auto scale = (128 - stronger_colour_pawns_missing * stronger_colour_pawns_missing) / static_cast<tune_t>(128);
-        
+
+    scale = 1;
     trace.endgame_scale = scale;
     trace.score = ((short)score * phase + ((score + 0x8000) >> 16) * scale * (24 - phase)) / 24;
 #else
@@ -386,12 +387,28 @@ static void print_parameter(std::stringstream& ss, const pair_t parameter)
         ss << "S(" << mg << ", " << eg << ")";
     }
 }
+
+static void print_parameter_tapered(std::stringstream& ss, const PhaseStages phase, const pair_t parameter)
+{
+    const auto val = round_value(parameter[static_cast<int32_t>(phase)]);
+    ss << val;
+}
+
 #else
 static void print_parameter(std::stringstream& ss, const tune_t parameter)
 {
     ss << round_value(std::round(parameter));
 }
 #endif
+
+static void print_single_tapered(std::stringstream& ss, const parameters_t& parameters, int& index, const PhaseStages phase, const std::string& name)
+{
+    ss << "." << name << " = ";
+    print_parameter_tapered(ss, phase, parameters[index]);
+    index++;
+
+    ss << "," << endl;
+}
 
 static void print_single(std::stringstream& ss, const parameters_t& parameters, int& index, const std::string& name)
 {
@@ -400,6 +417,22 @@ static void print_single(std::stringstream& ss, const parameters_t& parameters, 
     index++;
 
     ss << ";" << endl;
+}
+
+static void print_array_tapered(std::stringstream& ss, const parameters_t& parameters, int& index, const PhaseStages phase, const std::string& name, const int count)
+{
+    ss << "." << name << " = {";
+    for (auto i = 0; i < count; i++)
+    {
+        print_parameter_tapered(ss, phase, parameters[index]);
+        index++;
+
+        if (i != count - 1)
+        {
+            ss << ", ";
+        }
+    }
+    ss << "}," << endl;
 }
 
 static void print_array(std::stringstream& ss, const parameters_t& parameters, int& index, const std::string& name, const int count)
@@ -416,6 +449,24 @@ static void print_array(std::stringstream& ss, const parameters_t& parameters, i
         }
     }
     ss << "};" << endl;
+}
+
+static void print_pst_tapered(std::stringstream& ss, const parameters_t& parameters, int& index, const PhaseStages phase, const std::string& name)
+{
+    ss << "." << name << " = {";
+    for (auto i = 0; i < 48; i++)
+    {
+        print_parameter_tapered(ss, phase, parameters[index]);
+        index++;
+
+        ss << ", ";
+
+        if (i % 8 == 7)
+        {
+            ss << "// " << pc_to_str[i / 8] << "\n";
+        }
+    }
+    ss << "}," << endl;
 }
 
 static void print_pst(std::stringstream& ss, const parameters_t& parameters, int& index, const std::string& name)
@@ -516,10 +567,6 @@ parameters_t FourkdotcppEval::get_initial_parameters()
     get_initial_parameter_array(parameters, mobilities, 6);
     get_initial_parameter_array(parameters, king_attacks, 6);
     get_initial_parameter_array(parameters, open_files, 6);
-    //get_initial_parameter_array(parameters, passed_pawns, 7);
-    //get_initial_parameter_single(parameters, protected_pawn);
-    //get_initial_parameter_single(parameters, passed_pawn);
-    //get_initial_parameter_single(parameters, phalanx_pawn);
     get_initial_parameter_single(parameters, bishop_pair);
     return parameters;
 }
@@ -533,12 +580,30 @@ static coefficients_t get_coefficients(const Trace& trace)
     get_coefficient_array(coefficients, trace.mobilities, 6);
     get_coefficient_array(coefficients, trace.king_attacks, 6);
     get_coefficient_array(coefficients, trace.open_files, 6);
-    //get_coefficient_array(coefficients, trace.passed_pawns, 7);
-    //get_coefficient_single(coefficients, trace.protected_pawn);
-    //get_coefficient_single(coefficients, trace.passed_pawn);
-    //get_coefficient_single(coefficients, trace.phalanx_pawn);
     get_coefficient_single(coefficients, trace.bishop_pair);
     return coefficients;
+}
+
+static void print_parameters_tapered(const parameters_t& parameters)
+{
+    stringstream ss;
+
+    for (auto i = 0; i < 2; i++)
+    {
+        const auto phase = static_cast<PhaseStages>(i);
+        ss << (phase == PhaseStages::Midgame ? "MIDGAME:" : "ENDGAME:") << endl;
+        int index = 0;
+
+        print_array_tapered(ss, parameters, index, phase, "material", 6);
+        print_pst_tapered(ss, parameters, index, phase, "pst_rank");
+        print_pst_tapered(ss, parameters, index, phase, "pst_file");
+        print_array_tapered(ss, parameters, index, phase, "mobilities", 6);
+        print_array_tapered(ss, parameters, index, phase, "king_attacks", 6);
+        print_array_tapered(ss, parameters, index, phase, "open_files", 6);
+        print_single_tapered(ss, parameters, index, phase, "bishop_pair");
+    }
+
+    cout << ss.str() << "\n";
 }
 
 void FourkdotcppEval::print_parameters(const parameters_t& parameters)
@@ -546,6 +611,10 @@ void FourkdotcppEval::print_parameters(const parameters_t& parameters)
     parameters_t parameters_copy = parameters;
     rebalance_psts(parameters_copy, 6, true, 8, 1);
     rebalance_psts(parameters_copy, 6 + 6 * 8, false, 8, 1);
+
+    print_parameters_tapered(parameters_copy);
+
+    return;
 
     int index = 0;
     stringstream ss;
@@ -555,10 +624,6 @@ void FourkdotcppEval::print_parameters(const parameters_t& parameters)
     print_array(ss, parameters_copy, index, "mobilities", 6);
     print_array(ss, parameters_copy, index, "king_attacks", 6);
     print_array(ss, parameters_copy, index, "open_files", 6);
-    //print_array(ss, parameters_copy, index, "passed_pawns", 7);
-    //print_single(ss, parameters_copy, index, "protected_pawn");
-    //print_single(ss, parameters_copy, index, "passed_pawn");
-    //print_single(ss, parameters_copy, index, "phalanx_pawn");
     print_single(ss, parameters_copy, index, "bishop_pair");
     cout << ss.str() << "\n";
 }
