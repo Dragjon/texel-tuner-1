@@ -231,7 +231,7 @@ struct Trace
     int king_attacks[6][2]{};
     int open_files[6][2]{};
     //int protected_pawn[2]{};
-    //int passed_pawns[7][2]{};
+    int passed_pawns[4][2]{};
     //int passed_pawn[2]{};
     //int phalanx_pawn[2]{};
     int bishop_pair[2]{};
@@ -260,7 +260,7 @@ const i32 mobilities[] = { 0,0,0,0,0,0 };
 const i32 king_attacks[] = { 0,0,0,0,0,0 };
 //const i32 protected_pawn = 0;
 //const i32 passed_pawn = 0;
-//const i32 passed_pawns[] = { 0,0,0,0,0,0,0 };
+const i32 passed_pawns[] = { 0,0,0,0 };
 //const i32 phalanx_pawn = 0;
 const i32 bishop_pair = 0;
 
@@ -314,15 +314,17 @@ static Trace eval(Position& pos) {
                 score += pst_file[p * 8 + file] * 1;
                 TraceAdd(pst_file[p * 8 + file], 1);
 
-                if ((north(0x101010101010101UL << sq) & own_pawns) == 0) {
+                const u64 in_front = 0x101010101010101ULL << sq;
+
+                if ((north(in_front) & own_pawns) == 0) {
                     score += open_files[p];
                     TraceIncr(open_files[p]);
                 }
 
-                //if (p == Pawn && !(0x101010101010101ull << sq & no_passers)) {
-                //    score += passed_pawns[rank];
-                //    TraceIncr(passed_pawns[rank]);
-                //}
+                if (p == Pawn && rank > 2 && !(in_front & no_passers)) {
+                    score += passed_pawns[rank-3];
+                    TraceIncr(passed_pawns[rank-3]);
+                }
 
                 const u64 mobility = get_mobility(sq, p /*== King ? Queen : p*/, &pos);
                 if (p > Knight) {
@@ -566,6 +568,7 @@ parameters_t FourkdotcppEval::get_initial_parameters()
     get_initial_parameter_array(parameters, mobilities, 6);
     get_initial_parameter_array(parameters, king_attacks, 6);
     get_initial_parameter_array(parameters, open_files, 6);
+    get_initial_parameter_array(parameters, passed_pawns, 4);
     get_initial_parameter_single(parameters, bishop_pair);
     return parameters;
 }
@@ -579,6 +582,7 @@ static coefficients_t get_coefficients(const Trace& trace)
     get_coefficient_array(coefficients, trace.mobilities, 6);
     get_coefficient_array(coefficients, trace.king_attacks, 6);
     get_coefficient_array(coefficients, trace.open_files, 6);
+    get_coefficient_array(coefficients, trace.passed_pawns, 4);
     get_coefficient_single(coefficients, trace.bishop_pair);
     return coefficients;
 }
@@ -599,6 +603,7 @@ static void print_parameters_tapered(const parameters_t& parameters)
         print_array_tapered(ss, parameters, index, phase, "mobilities", 6);
         print_array_tapered(ss, parameters, index, phase, "king_attacks", 6);
         print_array_tapered(ss, parameters, index, phase, "open_files", 6);
+        print_array_tapered(ss, parameters, index, phase, "passed_pawns", 4);
         print_single_tapered(ss, parameters, index, phase, "bishop_pair");
     }
 
