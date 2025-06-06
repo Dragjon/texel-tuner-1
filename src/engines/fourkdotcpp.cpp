@@ -276,6 +276,8 @@ static Trace eval(Position& pos) {
         const int color = pos.flipped;
 
         const u64 own_pawns = pos.colour[0] & pos.pieces[Pawn];
+        const u64 opp_pawns = pos.colour[1] & pos.pieces[Pawn];
+        const u64 attacked_by_pawns = se(opp_pawns) | sw(opp_pawns);
         u64 no_passers = pos.colour[1] & pos.pieces[Pawn];
         no_passers |= se(no_passers) | sw(no_passers);
         const u64 opp_king_zone = king(lsb(pos.colour[1] & pos.pieces[King]), 0);
@@ -328,8 +330,8 @@ static Trace eval(Position& pos) {
 
                 const u64 mobility = get_mobility(sq, p /*== King ? Queen : p*/, &pos);
                 if (p > Knight) {
-                    score += mobilities[p] * count(mobility & ~pos.colour[0]);
-                    TraceAdd(mobilities[p], count(mobility & ~pos.colour[0]));
+                    score += mobilities[p] * count(mobility & ~pos.colour[0] & ~attacked_by_pawns);
+                    TraceAdd(mobilities[p], count(mobility & ~pos.colour[0] & ~attacked_by_pawns));
 
                     if (p != King && p != Pawn) {
                         score += king_attacks[p] * count(mobility & opp_king_zone);
