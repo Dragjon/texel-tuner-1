@@ -232,6 +232,7 @@ struct Trace
     int open_files[6][2]{};
     //int protected_pawn[2]{};
     int passed_pawns[4][2]{};
+    int passed_blocked_pawns[4][2]{};
     //int passed_pawn[2]{};
     //int phalanx_pawn[2]{};
     int bishop_pair[2]{};
@@ -261,6 +262,7 @@ const i32 king_attacks[] = { 0,0,0,0,0,0 };
 //const i32 protected_pawn = 0;
 //const i32 passed_pawn = 0;
 const i32 passed_pawns[] = { 0,0,0,0 };
+const i32 passed_blocked_pawns[] = { 0,0,0,0 };
 //const i32 phalanx_pawn = 0;
 const i32 bishop_pair = 0;
 
@@ -326,6 +328,11 @@ static Trace eval(Position& pos) {
                 if (p == Pawn && rank > 2 && !(in_front & no_passers)) {
                     score += passed_pawns[rank-3];
                     TraceIncr(passed_pawns[rank-3]);
+
+                    if (north(1ULL << sq) & pos.colour[1]) {
+                        score -= passed_blocked_pawns[rank - 3];
+                        TraceAdd(passed_blocked_pawns[rank - 3], -1);
+                    }
                 }
 
                 const u64 mobility = get_mobility(sq, p /*== King ? Queen : p*/, &pos);
@@ -571,6 +578,7 @@ parameters_t FourkdotcppEval::get_initial_parameters()
     get_initial_parameter_array(parameters, king_attacks, 6);
     get_initial_parameter_array(parameters, open_files, 6);
     get_initial_parameter_array(parameters, passed_pawns, 4);
+    get_initial_parameter_array(parameters, passed_blocked_pawns, 4);
     get_initial_parameter_single(parameters, bishop_pair);
     return parameters;
 }
@@ -585,6 +593,7 @@ static coefficients_t get_coefficients(const Trace& trace)
     get_coefficient_array(coefficients, trace.king_attacks, 6);
     get_coefficient_array(coefficients, trace.open_files, 6);
     get_coefficient_array(coefficients, trace.passed_pawns, 4);
+    get_coefficient_array(coefficients, trace.passed_blocked_pawns, 4);
     get_coefficient_single(coefficients, trace.bishop_pair);
     return coefficients;
 }
@@ -606,6 +615,7 @@ static void print_parameters_tapered(const parameters_t& parameters)
         print_array_tapered(ss, parameters, index, phase, "king_attacks", 6);
         print_array_tapered(ss, parameters, index, phase, "open_files", 6);
         print_array_tapered(ss, parameters, index, phase, "passed_pawns", 4);
+        print_array_tapered(ss, parameters, index, phase, "passed_blocked_pawns", 4);
         print_single_tapered(ss, parameters, index, phase, "bishop_pair");
     }
 
