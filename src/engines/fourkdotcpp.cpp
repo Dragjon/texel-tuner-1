@@ -330,8 +330,8 @@ static Trace eval(Position& pos) {
                     TraceIncr(passed_pawns[rank-3]);
 
                     if (north(1ULL << sq) & pos.colour[1]) {
-                        score -= passed_blocked_pawns[rank - 3];
-                        TraceAdd(passed_blocked_pawns[rank - 3], -1);
+                        score += passed_blocked_pawns[rank - 3];
+                        TraceIncr(passed_blocked_pawns[rank - 3]);
                     }
                 }
 
