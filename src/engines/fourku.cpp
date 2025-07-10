@@ -723,6 +723,7 @@ Position get_position_from_external(const chess::Board& board)
 
 EvalResult FourkuEval::get_fen_eval_result(const string& fen)
 {
+
     Position position;
     set_fen(position, fen);
     const auto trace = eval(position);

@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <cstdlib> 
 
 using namespace std;
 using namespace std::chrono;
@@ -921,6 +922,7 @@ void Tuner::run(const std::vector<DataSource>& sources)
 
         if (epoch % 100 == 0)
         {
+            system("cls");
             const auto elapsed_ms = duration_cast<milliseconds>(high_resolution_clock::now() - loop_start).count();
             const auto epochs_per_second = epoch * 1000.0 / elapsed_ms;
             const tune_t error = get_average_error(thread_pool, entries, parameters, K);
